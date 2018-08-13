@@ -42,23 +42,6 @@ class RouteServiceProvider extends ServiceProvider
     }
 
     /**
-     * Define the "web" routes for the application.
-     *
-     * These routes all receive session state, CSRF protection, etc.
-     *
-     * @return void
-     */
-    protected function mapWebRoutes()
-    {
-        Route::group([
-            'middleware' => 'web',
-            'namespace'  => $this->namespace,
-        ], function ($router) {
-            require base_path('routes/web.php');
-        });
-    }
-
-    /**
      * Define the "api" routes for the application.
      *
      * These routes are typically stateless.
@@ -69,10 +52,27 @@ class RouteServiceProvider extends ServiceProvider
     {
         Route::group([
             'middleware' => 'api',
-            'namespace'  => $this->namespace,
-            'prefix'     => 'api',
+            'namespace' => $this->namespace,
+            'prefix' => 'api',
         ], function ($router) {
             require base_path('routes/api.php');
+        });
+    }
+
+    /**
+     * Define the "web" routes for the application.
+     *
+     * These routes all receive session state, CSRF protection, etc.
+     *
+     * @return void
+     */
+    protected function mapWebRoutes()
+    {
+        Route::group([
+            'middleware' => 'web',
+            'namespace' => $this->namespace,
+        ], function ($router) {
+            require base_path('routes/web.php');
         });
     }
 
@@ -87,10 +87,10 @@ class RouteServiceProvider extends ServiceProvider
     {
         Route::group([
             'middleware' => ['web', 'installer'],
-            'namespace'  => $this->namespace,
-                ], function ($router) {
-                    require base_path('routes/installer.php');
-                });
+            'namespace' => $this->namespace,
+        ], function ($router) {
+            require base_path('routes/installer.php');
+        });
     }
 
     /**
@@ -104,10 +104,10 @@ class RouteServiceProvider extends ServiceProvider
     {
         Route::group([
             'middleware' => ['web', 'redirect', 'install'],
-            'namespace'  => $this->namespace,
-            'prefix'     => 'app/update',
-                ], function ($router) {
-                    require base_path('routes/update.php');
-                });
+            'namespace' => $this->namespace,
+            'prefix' => 'app/update',
+        ], function ($router) {
+            require base_path('routes/update.php');
+        });
     }
 }

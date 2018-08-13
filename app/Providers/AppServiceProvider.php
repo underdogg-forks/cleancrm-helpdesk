@@ -24,7 +24,7 @@ class AppServiceProvider extends ServiceProvider
     public function register()
     {
         $this->app->bind('Illuminate\Contracts\Auth\Registrar');
-        require_once __DIR__.'/../Http/helpers.php';
+        require_once __DIR__ . '/../Http/helpers.php';
         if ($this->app->environment('local', 'testing')) {
             $this->app->register(DuskServiceProvider::class);
         }
@@ -36,7 +36,10 @@ class AppServiceProvider extends ServiceProvider
     public function boot()
     {
         Queue::failing(function (JobFailed $event) {
-            loging('Failed Job - '.$event->connectionName, json_encode([$event->job->payload(), 'error' => $event->exception->getMessage().' file=>'.$event->exception->getFile().' line=>'.$event->exception->getLine()]));
+            loging('Failed Job - ' . $event->connectionName, json_encode([
+                $event->job->payload(),
+                'error' => $event->exception->getMessage() . ' file=>' . $event->exception->getFile() . ' line=>' . $event->exception->getLine()
+            ]));
         });
         Route::singularResourceParameters(false);
         $this->composer();
@@ -102,7 +105,7 @@ class AppServiceProvider extends ServiceProvider
     public function isPluginDir($name)
     {
         $check = false;
-        if (is_dir(app_path('Plugins'.DIRECTORY_SEPARATOR.$name))) {
+        if (is_dir(app_path('Plugins' . DIRECTORY_SEPARATOR . $name))) {
             $check = true;
         }
 

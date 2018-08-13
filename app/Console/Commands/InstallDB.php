@@ -43,7 +43,7 @@ class InstallDB extends Command
     {
         try {
             if ($this->confirm('Do you want to migrate tables now?')) {
-                $env = base_path().DIRECTORY_SEPARATOR.'.env';
+                $env = base_path() . DIRECTORY_SEPARATOR . '.env';
                 if (!is_file($env)) {
                     throw new \Exception("Please run 'php artisan install:faveo'");
                 }
@@ -53,15 +53,15 @@ class InstallDB extends Command
                     $this->call('install:migrate');
                     $this->call('install:seed');
                 } else {
-                    $path = base_path().'/DB/dummy-data.sql';
+                    $path = base_path() . '/DB/dummy-data.sql';
                     DB::unprepared(file_get_contents($path));
                 }
                 $headers = ['user_name', 'email', 'password'];
                 $data = [
                     [
                         'user_name' => 'demo_admin',
-                        'email'     => '',
-                        'password'  => 'demopass',
+                        'email' => '',
+                        'password' => 'demopass',
                     ],
                 ];
                 $this->table($headers, $data);

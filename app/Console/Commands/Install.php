@@ -66,16 +66,26 @@ class Install extends Command
     public function appEnv()
     {
         $extensions = [
-            'curl', 'ctype', 'imap', 'mbstring',
-            'openssl', 'tokenizer', 'zip',
-            'pdo', 'mysqli', 'bcmath', 'iconv',
-            'XML', 'json',  'fileinfo',
+            'curl',
+            'ctype',
+            'imap',
+            'mbstring',
+            'openssl',
+            'tokenizer',
+            'zip',
+            'pdo',
+            'mysqli',
+            'bcmath',
+            'iconv',
+            'XML',
+            'json',
+            'fileinfo',
         ];
         $result = [];
         foreach ($extensions as $key => $extension) {
             $result[$key]['extension'] = $extension;
             if (!extension_loaded($extension)) {
-                $result[$key]['status'] = "Not Loading, Please open '".php_ini_loaded_file()."' and add 'extension = ".$extension;
+                $result[$key]['status'] = "Not Loading, Please open '" . php_ini_loaded_file() . "' and add 'extension = " . $extension;
             } else {
                 $result[$key]['status'] = 'Loading';
             }

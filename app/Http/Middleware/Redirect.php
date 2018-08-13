@@ -10,7 +10,7 @@ class Redirect
      * Handle an incoming request.
      *
      * @param \Illuminate\Http\Request $request
-     * @param \Closure                 $next
+     * @param \Closure $next
      *
      * @return mixed
      */
@@ -25,10 +25,10 @@ class Redirect
         $segments = $request->segments();
         if (count($segments) > 0) {
             foreach ($segments as $segment) {
-                $seg .= '/'.$segment;
+                $seg .= '/' . $segment;
             }
         }
-        $url = $url.$seg;
+        $url = $url . $seg;
 
         return redirect($url);
     }

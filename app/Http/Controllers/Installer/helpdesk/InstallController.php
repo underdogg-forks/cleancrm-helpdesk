@@ -4,15 +4,11 @@ namespace App\Http\Controllers\Installer\helpdesk;
 
 // controllers
 use App\Http\Controllers\Controller;
-// requests
-use App\Http\Requests\helpdesk\InstallerRequest;
 use App\Model\helpdesk\Settings\System;
-// models
 use App\Model\helpdesk\Utility\Date_time_format;
 use App\Model\helpdesk\Utility\Timezones;
 use App\User;
 use Artisan;
-// classes
 use Cache;
 use Config;
 use DB;
@@ -26,6 +22,10 @@ use Session;
 use UnAuth;
 use View;
 
+// requests
+// models
+// classes
+
 /**
  * |=======================================================================
  * |Class: InstallController
@@ -34,7 +34,7 @@ use View;
  *  Class to perform the first install operation without this the database
  *  settings could not be started
  *
- *  @author     Ladybird <info@ladybirdweb.com>
+ * @author     Ladybird <info@ladybirdweb.com>
  */
 class InstallController extends Controller
 {
@@ -81,7 +81,7 @@ class InstallController extends Controller
     {
         // checking if the installation is running for the first time or not
         $directory = base_path();
-        if (file_exists($directory.DIRECTORY_SEPARATOR.'.env')) {
+        if (file_exists($directory . DIRECTORY_SEPARATOR . '.env')) {
             return redirect('/auth/login');
         } else {
             Cache::flush();
@@ -225,18 +225,18 @@ class InstallController extends Controller
     public function accountcheck(Request $request)
     {
         $validator = \Validator::make($request->all(), [
-                    'firstname'       => 'required|max:20',
-                    'Lastname'        => 'required|max:20',
-                    'email'           => 'required|max:50|email',
-                    'username'        => 'required|max:50|min:3',
-                    'password'        => 'required|min:6',
-                    'confirmpassword' => 'required|same:password',
+            'firstname' => 'required|max:20',
+            'Lastname' => 'required|max:20',
+            'email' => 'required|max:50|email',
+            'username' => 'required|max:50|min:3',
+            'password' => 'required|min:6',
+            'confirmpassword' => 'required|same:password',
         ]);
 
         if ($validator->fails()) {
             return redirect('step5')
-                            ->withErrors($validator)
-                            ->withInput();
+                ->withErrors($validator)
+                ->withInput();
         }
         // checking is the installation was done previously
         // Set variables fetched from input request
@@ -286,15 +286,15 @@ class InstallController extends Controller
         $admin_tzone = $timezones->id;
         // creating an user
         $user = User::updateOrCreate(['id' => 1], [
-                    'first_name'   => $firstname,
-                    'last_name'    => $lastname,
-                    'email'        => $email,
-                    'user_name'    => $username,
-                    'password'     => Hash::make($password),
-                    //'assign_group' => 1,
-                    'primary_dpt'  => 1,
-                    'active'       => 1,
-                    'role'         => 'admin',
+            'first_name' => $firstname,
+            'last_name' => $lastname,
+            'email' => $email,
+            'user_name' => $username,
+            'password' => Hash::make($password),
+            //'assign_group' => 1,
+            'primary_dpt' => 1,
+            'active' => 1,
+            'role' => 'admin',
         ]);
 
         // checking if the user have been created
@@ -333,6 +333,20 @@ class InstallController extends Controller
         }
     }
 
+    public function updateInstalEnv()
+    {
+        $env = base_path() . DIRECTORY_SEPARATOR . '.env';
+        if (is_file($env)) {
+            $txt = 'DB_INSTALL=1';
+            $txt1 = 'APP_ENV=development';
+            file_put_contents($env, $txt . PHP_EOL, FILE_APPEND | LOCK_EX);
+            file_put_contents($env, $txt1, FILE_APPEND | LOCK_EX);
+        } else {
+            throw new Exception('.env not found');
+        }
+        Artisan::call('jwt:secret');
+    }
+
     /**
      * Post finalcheck
      * checking prerequisites.
@@ -352,7 +366,7 @@ class InstallController extends Controller
 
     public function changeFilePermission()
     {
-        $path1 = base_path().DIRECTORY_SEPARATOR.'.env';
+        $path1 = base_path() . DIRECTORY_SEPARATOR . '.env';
         if (chmod($path1, 0644)) {
             $f1 = substr(sprintf('%o', fileperms($path1)), -3);
             if ($f1 >= '644') {
@@ -374,6 +388,31 @@ class InstallController extends Controller
     public function jsDisabled()
     {
         return view('themes/default1/installer/helpdesk/check-js')->with('url', 'step1');
+    }
+
+    public function checkPreInstall()
+    {
+        try {
+            $check_for_pre_installation = System::select('id')->first();
+            if ($check_for_pre_installation) {
+                throw new Exception('This database already has tables and data. Please provide fresh database', 100);
+            }
+        } catch (Exception $ex) {
+            if ($ex->getCode() == 100) {
+                Artisan::call('droptables');
+                $this->createEnv(false);
+            }
+        }
+        Artisan::call('key:generate', ['--force' => true]);
+
+        $url = url('migrate');
+        $result = [
+            'success' => 'Pre migration test has run successfully',
+            'next' => 'Migrating tables in database',
+            'api' => $url
+        ];
+
+        return response()->json(compact('result'));
     }
 
     public function createEnv($api = true)
@@ -417,7 +456,11 @@ class InstallController extends Controller
         }
         if ($api) {
             $url = url('preinstall/check');
-            $result = ['success' => 'Environment configuration file has been created successfully', 'next' => 'Running pre migration test', 'api' => $url];
+            $result = [
+                'success' => 'Environment configuration file has been created successfully',
+                'next' => 'Running pre migration test',
+                'api' => $url
+            ];
 
             return response()->json(compact('result'));
         }
@@ -429,11 +472,11 @@ class InstallController extends Controller
         $ENV['APP_BUGSNAG'] = 'true';
         $ENV['APP_URL'] = url('/');
         $ENV['DB_TYPE'] = $default;
-        $ENV['DB_HOST'] = '"'.$host.'"';
-        $ENV['DB_PORT'] = '"'.$port.'"';
-        $ENV['DB_DATABASE'] = '"'.$database.'"';
-        $ENV['DB_USERNAME'] = '"'.$dbusername.'"';
-        $ENV['DB_PASSWORD'] = '"'.$dbpassword.'"';
+        $ENV['DB_HOST'] = '"' . $host . '"';
+        $ENV['DB_PORT'] = '"' . $port . '"';
+        $ENV['DB_DATABASE'] = '"' . $database . '"';
+        $ENV['DB_USERNAME'] = '"' . $dbusername . '"';
+        $ENV['DB_PASSWORD'] = '"' . $dbpassword . '"';
         $ENV['MAIL_DRIVER'] = 'smtp';
         $ENV['MAIL_HOST'] = 'mailtrap.io';
         $ENV['MAIL_PORT'] = '2525';
@@ -441,7 +484,7 @@ class InstallController extends Controller
         $ENV['MAIL_PASSWORD'] = 'null';
         $ENV['CACHE_DRIVER'] = 'file';
         $ENV['SESSION_DRIVER'] = 'file';
-        $ENV['SESSION_COOKIE_NAME'] = 'faveo_'.rand(0, 10000);
+        $ENV['SESSION_COOKIE_NAME'] = 'faveo_' . rand(0, 10000);
         $ENV['QUEUE_DRIVER'] = 'sync';
         $ENV['JWT_TTL'] = 4;
         $ENV['FCM_SERVER_KEY'] = 'AIzaSyCyx5OFnsRFUmDLTMbPV50ZMDUGSG-bLw4';
@@ -452,39 +495,18 @@ class InstallController extends Controller
         foreach ($ENV as $key => $val) {
             $config .= "{$key}={$val}\n";
         }
-        if (is_file(base_path().DIRECTORY_SEPARATOR.'.env')) {
-            unlink(base_path().DIRECTORY_SEPARATOR.'.env');
+        if (is_file(base_path() . DIRECTORY_SEPARATOR . '.env')) {
+            unlink(base_path() . DIRECTORY_SEPARATOR . '.env');
         }
-        if (!is_file(base_path().DIRECTORY_SEPARATOR.'example.env')) {
-            fopen(base_path().DIRECTORY_SEPARATOR.'example.env', 'w');
+        if (!is_file(base_path() . DIRECTORY_SEPARATOR . 'example.env')) {
+            fopen(base_path() . DIRECTORY_SEPARATOR . 'example.env', 'w');
         }
 
         // Write environment file
-        $fp = fopen(base_path().DIRECTORY_SEPARATOR.'example.env', 'w');
+        $fp = fopen(base_path() . DIRECTORY_SEPARATOR . 'example.env', 'w');
         fwrite($fp, $config);
         fclose($fp);
-        rename(base_path().DIRECTORY_SEPARATOR.'example.env', base_path().DIRECTORY_SEPARATOR.'.env');
-    }
-
-    public function checkPreInstall()
-    {
-        try {
-            $check_for_pre_installation = System::select('id')->first();
-            if ($check_for_pre_installation) {
-                throw new Exception('This database already has tables and data. Please provide fresh database', 100);
-            }
-        } catch (Exception $ex) {
-            if ($ex->getCode() == 100) {
-                Artisan::call('droptables');
-                $this->createEnv(false);
-            }
-        }
-        Artisan::call('key:generate', ['--force' => true]);
-
-        $url = url('migrate');
-        $result = ['success' => 'Pre migration test has run successfully', 'next' => 'Migrating tables in database', 'api' => $url];
-
-        return response()->json(compact('result'));
+        rename(base_path() . DIRECTORY_SEPARATOR . 'example.env', base_path() . DIRECTORY_SEPARATOR . '.env');
     }
 
     public function migrate()
@@ -498,7 +520,7 @@ class InstallController extends Controller
                     Artisan::call('migrate', ['--force' => true]);
                     $db_install_method = 'migrate';
                 } else {
-                    $path = base_path().DIRECTORY_SEPARATOR.'DB'.DIRECTORY_SEPARATOR.'dummy-data.sql';
+                    $path = base_path() . DIRECTORY_SEPARATOR . 'DB' . DIRECTORY_SEPARATOR . 'dummy-data.sql';
                     DB::unprepared(file_get_contents($path));
                     $db_install_method = 'dump';
                 }
@@ -531,7 +553,7 @@ class InstallController extends Controller
     {
         try {
             if ($request->input('dummy-data') == 'on') {
-                $path = base_path().'/DB/dummy-data.sql';
+                $path = base_path() . '/DB/dummy-data.sql';
                 DB::unprepared(DB::raw(file_get_contents($path)));
             } else {
                 \Schema::disableForeignKeyConstraints();
@@ -554,19 +576,5 @@ class InstallController extends Controller
         $result = ['success' => 'Database has been setup successfully.'];
 
         return response()->json(compact('result'));
-    }
-
-    public function updateInstalEnv()
-    {
-        $env = base_path().DIRECTORY_SEPARATOR.'.env';
-        if (is_file($env)) {
-            $txt = 'DB_INSTALL=1';
-            $txt1 = 'APP_ENV=development';
-            file_put_contents($env, $txt.PHP_EOL, FILE_APPEND | LOCK_EX);
-            file_put_contents($env, $txt1, FILE_APPEND | LOCK_EX);
-        } else {
-            throw new Exception('.env not found');
-        }
-        Artisan::call('jwt:secret');
     }
 }

@@ -5,9 +5,10 @@ namespace App\Http\Middleware;
 use Cache;
 use Closure;
 use Illuminate\Support\Facades\App;
-// use Illuminate\Contracts\Routing\Middleware;
 use Illuminate\Support\Facades\Config;
 use Session;
+
+// use Illuminate\Contracts\Routing\Middleware;
 
 class LanguageMiddleware
 {

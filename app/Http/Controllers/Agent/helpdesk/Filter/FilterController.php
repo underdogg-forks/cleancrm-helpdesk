@@ -3,26 +3,22 @@
 namespace App\Http\Controllers\Agent\helpdesk\Filter;
 
 //requests
-use App\Http\Controllers\Agent\helpdesk\TicketController;
 use App\Http\Controllers\Controller;
-//controllers
-use App\Http\Requests;
 use App\Model\helpdesk\Agent\Department;
-//models
 use App\Model\helpdesk\Agent\DepartmentAssignAgents;
-use App\Model\helpdesk\Filters\Filter;
-use App\Model\helpdesk\Filters\Label;
 use App\Model\helpdesk\Manage\Help_topic;
 use App\Model\helpdesk\Ticket\Ticket_Priority;
-use App\Model\helpdesk\Ticket\Ticket_Status;
 use App\Model\helpdesk\Ticket\Tickets;
 use App\Model\helpdesk\Ticket\TicketStatusType;
 use App\User;
-//classes
 use Auth;
 use DB;
 use Illuminate\Http\Request;
 use UTC;
+
+//controllers
+//models
+//classes
 
 /**
  * -----------------------------------------------------------------------------
@@ -54,6 +50,29 @@ class FilterController extends Controller
     }
 
     /**
+     * @category function to get GMT for system timezone
+     *
+     * @param null
+     *
+     * @var $system , $tz
+     *
+     * @return string GMT value of timezone
+     */
+    public function getGMT()
+    {
+        $system = \App\Model\helpdesk\Settings\System::select('time_zone')->first();
+        $timezone = \DB::table('timezone')->select('location')->where('id', '=', $system->time_zone)->first();
+        $location = '(GMT) London';
+        if ($timezone) {
+            $location = $timezone->location;
+        }
+        $tz = explode(')', substr($location, stripos($location, 'T')
+            + 1));
+
+        return $tz[0];
+    }
+
+    /**
      * @category function to handle ticket table/filteration request and build tables
      *
      * @param Array/Object $request
@@ -71,7 +90,7 @@ class FilterController extends Controller
                 $inputs = [];
                 foreach ($request->all() as $key => $value) {
                     if ($key != 'api' && $key != 'token' && $key != 'page' && $key
-                            != 'sort-by' && $key != 'order' && $key != 'records_per_page') {
+                        != 'sort-by' && $key != 'order' && $key != 'records_per_page') {
                         $inputs[$key] = explode(',', $value); //
                     }
                 }
@@ -80,7 +99,7 @@ class FilterController extends Controller
             } else {
                 $inputs = json_decode(htmlspecialchars_decode($request->get('options')));
                 // dd($inputs);
-                $table = $this->checkRequestIsCorrect($table, (array) $inputs);
+                $table = $this->checkRequestIsCorrect($table, (array)$inputs);
             }
         }
 
@@ -100,19 +119,82 @@ class FilterController extends Controller
     {
         $ticket = new Tickets();
         $tickets = $ticket
-                        ->leftJoin('ticket_source', 'ticket_source.id', '=', 'tickets.source')
-                        ->leftJoin('ticket_priority', 'ticket_priority.priority_id', '=', 'tickets.priority_id')
-                        ->leftJoin('users as u1', 'u1.id', '=', 'tickets.user_id')
-                        ->leftJoin('teams', 'teams.id', '=', 'tickets.team_id')
-                        ->leftJoin('users as u2', 'u2.id', '=', 'tickets.assigned_to')
-                        ->leftJoin('ticket_collaborator', 'ticket_collaborator.ticket_id', '=', 'tickets.id')
-                        ->leftJoin('ticket_thread as th', 'th.ticket_id', '=', 'tickets.id')
-                        ->leftJoin('ticket_attachment', 'ticket_attachment.thread_id', '=', 'th.id')
-                        ->select(
-                                'tickets.id', 'th.title', 'tickets.ticket_number', 'u1.user_name as c_uname', 'u2.user_name as a_uname', \DB::raw('CONVERT_TZ(max(th.updated_at), "+00:00", "'.$this->gmt.'") as updated_at2'), \DB::raw('CONVERT_TZ(min(th.updated_at), "+00:00", "'.$this->gmt.'") as created_at2'), \DB::raw('CONVERT_TZ(max(tickets.duedate), "+00:00", "'.$this->gmt.'") as duedate'), \DB::raw('max(th.updated_at) as updated_at'), \DB::raw('min(th.updated_at) as created_at'), 'tickets.duedate as due', 'u1.id as c_uid', 'ticket_priority.priority as priority', 'u1.first_name AS c_fname', 'u1.last_name as c_lname', 'u2.id as a_uid', 'u2.first_name as a_fname', 'u2.last_name as a_lname', 'u1.active as verified', 'teams.name', 'tickets.assigned_to', 'ticket_priority.priority_color as color', 'ticket_source.css_class as css', \DB::raw('COUNT(ticket_attachment.thread_id) as countattachment'), DB::raw('COUNT(ticket_collaborator.ticket_id) as countcollaborator'), \DB::raw('COUNT(DISTINCT th.id) as countthread'), \DB::raw('substring_index(group_concat(if(`th`.`is_internal` = 0, `th`.`poster`,null)ORDER By th.id desc) , ",", 1) as last_replier'), \DB::raw('substring_index(group_concat(th.title order by th.id asc SEPARATOR "-||,||-") , "-||,||-", 1) as ticket_title'), 'ticket_source.name as source'
-                        )->groupby('tickets.id');
+            ->leftJoin('ticket_source', 'ticket_source.id', '=', 'tickets.source')
+            ->leftJoin('ticket_priority', 'ticket_priority.priority_id', '=', 'tickets.priority_id')
+            ->leftJoin('users as u1', 'u1.id', '=', 'tickets.user_id')
+            ->leftJoin('teams', 'teams.id', '=', 'tickets.team_id')
+            ->leftJoin('users as u2', 'u2.id', '=', 'tickets.assigned_to')
+            ->leftJoin('ticket_collaborator', 'ticket_collaborator.ticket_id', '=', 'tickets.id')
+            ->leftJoin('ticket_thread as th', 'th.ticket_id', '=', 'tickets.id')
+            ->leftJoin('ticket_attachment', 'ticket_attachment.thread_id', '=', 'th.id')
+            ->select(
+                'tickets.id', 'th.title', 'tickets.ticket_number', 'u1.user_name as c_uname', 'u2.user_name as a_uname',
+                \DB::raw('CONVERT_TZ(max(th.updated_at), "+00:00", "' . $this->gmt . '") as updated_at2'),
+                \DB::raw('CONVERT_TZ(min(th.updated_at), "+00:00", "' . $this->gmt . '") as created_at2'),
+                \DB::raw('CONVERT_TZ(max(tickets.duedate), "+00:00", "' . $this->gmt . '") as duedate'),
+                \DB::raw('max(th.updated_at) as updated_at'), \DB::raw('min(th.updated_at) as created_at'),
+                'tickets.duedate as due', 'u1.id as c_uid', 'ticket_priority.priority as priority',
+                'u1.first_name AS c_fname', 'u1.last_name as c_lname', 'u2.id as a_uid', 'u2.first_name as a_fname',
+                'u2.last_name as a_lname', 'u1.active as verified', 'teams.name', 'tickets.assigned_to',
+                'ticket_priority.priority_color as color', 'ticket_source.css_class as css',
+                \DB::raw('COUNT(ticket_attachment.thread_id) as countattachment'),
+                DB::raw('COUNT(ticket_collaborator.ticket_id) as countcollaborator'),
+                \DB::raw('COUNT(DISTINCT th.id) as countthread'),
+                \DB::raw('substring_index(group_concat(if(`th`.`is_internal` = 0, `th`.`poster`,null)ORDER By th.id desc) , ",", 1) as last_replier'),
+                \DB::raw('substring_index(group_concat(th.title order by th.id asc SEPARATOR "-||,||-") , "-||,||-", 1) as ticket_title'),
+                'ticket_source.name as source'
+            )->groupby('tickets.id');
 
         return $tickets;
+    }
+
+    /**
+     * @category function to format and return user tickets
+     *
+     * @param string $segment
+     *
+     * @return builder
+     */
+    public function formatUserTickets($segment)
+    {
+        $table = $this->table();
+        $convert_to_array = explode('/', $segment);
+        if ($convert_to_array[1] == 'user') {
+            $user_id = $convert_to_array[2];
+            $user = \DB::table('users')->select('role', 'id')->where('id', '=', $user_id)->first();
+            if ($user->role == 'user') {
+                $table = $table->where('tickets.user_id', '=', $user->id);
+            } else {
+                $table = $table->where('tickets.assigned_to', '=', $user->id);
+            }
+        } elseif ($convert_to_array[1] == 'organizations') {
+            $users = []; //initialize by assuming there is no user in the organization
+            $organizations_details = \App\Model\helpdesk\Agent_panel\Organization::select('id', 'domain')->where('id',
+                '=', $convert_to_array[2])->first()->toArray(); //fetch organization details
+            if (count($organizations_details) > 0) { //if organizationdetails found then process further
+                $org_users = \App\Model\helpdesk\Agent_panel\User_org::select('user_id')->where('org_id', '=',
+                    $organizations_details['id'])->get()->toArray();
+                if (count($org_users) > 0) {
+                    $users = array_column($org_users, 'user_id');
+                }
+                if ($organizations_details['domain'] != '') {
+                    $str = str_replace(',', '|@', '@' . $organizations_details['domain']);
+                    $domain_users = User::select('id')->where('role', '=',
+                        'user')->whereRaw("email REGEXP '" . $str . "'")->whereNOtIn('id', $users);
+                    $domain_users = $domain_users->where('is_delete', '!=', 1)->where('ban', '!=', 1)->get()->toArray();
+                    if (count($domain_users) > 0) {
+                        $users = array_merge($users, array_column($domain_users, 'id'));
+                    }
+                }
+            }
+            $table = $table->whereIn('tickets.user_id', $users);
+        } elseif ($convert_to_array[1] == 'department') {
+            $table = $table->where('dept_id', '=', $convert_to_array[2]);
+        } else {
+            $table = $table->where('team_id', '=', $convert_to_array[2]);
+        }
+
+        return $table->whereIn('tickets.status', getStatusArray($convert_to_array[3]));
     }
 
     /**
@@ -164,7 +246,7 @@ class FilterController extends Controller
     /**
      * @category function to filter tickets based on user input requests
      *
-     * @param string $input, $value, $table
+     * @param string $input , $value, $table
      *
      * @return builder $table
      */
@@ -184,29 +266,29 @@ class FilterController extends Controller
 
             case 'types':
                 $table = $table->leftJoin('ticket_type', 'ticket_type.id', '=', 'tickets.type')
-                        ->whereIn('ticket_type.name', $value);
+                    ->whereIn('ticket_type.name', $value);
 
                 return $table;
                 break;
 
             case 'tags':
                 $table = $table
-                        ->leftJoin('filters as tag', function ($join) {
-                            $join->on('tickets.id', '=', 'tag.ticket_id')
+                    ->leftJoin('filters as tag', function ($join) {
+                        $join->on('tickets.id', '=', 'tag.ticket_id')
                             ->where('tag.key', '=', 'tag');
-                        })
-                        ->whereIn('tag.value', $value);
+                    })
+                    ->whereIn('tag.value', $value);
 
                 return $table;
                 break;
 
             case 'labels':
                 $table = $table
-                        ->leftJoin('filters as label', function ($join) {
-                            $join->on('tickets.id', '=', 'label.ticket_id')
+                    ->leftJoin('filters as label', function ($join) {
+                        $join->on('tickets.id', '=', 'label.ticket_id')
                             ->where('label.key', '=', 'label');
-                        })
-                        ->whereIn('label.value', $value);
+                    })
+                    ->whereIn('label.value', $value);
 
                 return $table;
                 break;
@@ -246,20 +328,20 @@ class FilterController extends Controller
                         $table = $table->where(function ($query) {
                             $query->where(function ($query2) {
                                 $query2->where('tickets.team_id', '=', 0)
-                                        ->orWhere('tickets.team_id', '=', null);
+                                    ->orWhere('tickets.team_id', '=', null);
                             })->where(function ($query3) {
                                 $query3->where('tickets.assigned_to', '=', 0)
-                                        ->orWhere('tickets.assigned_to', '=', null);
+                                    ->orWhere('tickets.assigned_to', '=', null);
                             });
                         });
                     } elseif ($value[0] == 1 || $value[0] == '1') {
                         $table = $table->where(function ($query) {
                             $query->where(function ($query2) {
                                 $query2->where('tickets.team_id', '<>', 0)
-                                        ->Where('tickets.team_id', '<>', null);
+                                    ->Where('tickets.team_id', '<>', null);
                             })->orWhere(function ($query3) {
                                 $query3->where('tickets.assigned_to', '<>', 0)
-                                        ->Where('tickets.assigned_to', '<>', null);
+                                    ->Where('tickets.assigned_to', '<>', null);
                             });
                         });
                     } else {
@@ -334,14 +416,15 @@ class FilterController extends Controller
     /**
      * @category function to filter the tickets based on show value in the request
      *
-     * @param array $value(), builder object $table
+     * @param array $value (), builder object $table
      *
      * @return builder object $table
      */
     public function showPage($value, $table)
     {
         $table = $this->userIsAgent($table);
-        $has_status = array_key_exists('status', (array) json_decode(htmlspecialchars_decode($this->request->get('options'))));
+        $has_status = array_key_exists('status',
+            (array)json_decode(htmlspecialchars_decode($this->request->get('options'))));
         switch ($value[0]) {
             case 'inbox':
                 return $this->returnShowPageWithStatus($has_status, $table, 'open');
@@ -365,9 +448,9 @@ class FilterController extends Controller
 
             case 'overdue':
                 $table = $table->where('isanswered', '=', 0)
-                        ->whereNotNull('tickets.duedate')
-                        ->where('tickets.duedate', '!=', '00-00-00 00:00:00')
-                        ->where('tickets.duedate', '<', \Carbon\Carbon::now());
+                    ->whereNotNull('tickets.duedate')
+                    ->where('tickets.duedate', '!=', '00-00-00 00:00:00')
+                    ->where('tickets.duedate', '<', \Carbon\Carbon::now());
 
                 return $this->returnShowPageWithStatus($has_status, $table, 'open');
 
@@ -391,7 +474,7 @@ class FilterController extends Controller
      *
      * @param $table querybuilder
      *
-     * @var $id, $dept
+     * @var $id , $dept
      *
      * @return $table
      */
@@ -402,11 +485,46 @@ class FilterController extends Controller
             $dept = DepartmentAssignAgents::where('agent_id', '=', $id)->pluck('department_id')->toArray();
             $table = $table->where(function ($query) use ($dept) {
                 $query->whereIn('tickets.dept_id', $dept)
-                        ->orWhere('assigned_to', '=', Auth::user()->id);
+                    ->orWhere('assigned_to', '=', Auth::user()->id);
             });
         }
 
         return $table;
+    }
+
+    /**
+     * @category function to return builder for show filter after checking if input
+     * request has status or not
+     *
+     * @param bool $has_status (if request has status filter values or not),
+     *                            Object $table, string $status(basic pupose if status)
+     *
+     * @return object $table;
+     */
+    public function returnShowPageWithStatus($has_status, $table, $status)
+    {
+        if ($has_status) {
+            return $table;
+        }
+
+        return $table->whereIn('tickets.status', getStatusArray($status));
+    }
+
+    /**
+     * @category function to filter table builder based on requested status
+     *
+     * @param string array $status_array, builder $table
+     *
+     * @return builder $table
+     */
+    public function filterByStatus($status_array, $table)
+    {
+        $status = DB::table('ticket_status')->whereIn('name', $status_array)->pluck('id');
+        if (count($status) > 0) {
+            return $table->whereIn('tickets.status', $status);
+        } else {
+            return $table->where('tickets.id', '=', null);
+        }
     }
 
     /**
@@ -430,7 +548,7 @@ class FilterController extends Controller
             $departmentTickets = $this->userCanSeeDepartmentTicket($value);
             if ($departmentTickets[0]) {
                 $table = $table->leftJoin('department as dep', 'tickets.dept_id', '=', 'dep.id')
-                        ->whereIn('dep.id', $departmentTickets[1]);
+                    ->whereIn('dep.id', $departmentTickets[1]);
             } else {
                 $table = $table->where('tickets.id', '=', null);
             }
@@ -454,9 +572,13 @@ class FilterController extends Controller
         if (Auth::user()->role == 'admin') {
             return [true, $requested_dept];
         } else {
-            $agent_dept = DepartmentAssignAgents::where('agent_id', '=', Auth::user()->id)->pluck('department_id')->toArray();
+            $agent_dept = DepartmentAssignAgents::where('agent_id', '=',
+                Auth::user()->id)->pluck('department_id')->toArray();
             if (count($requested_dept) > 0 && count($agent_dept) > 0) {
-                return [count(array_intersect($requested_dept, $agent_dept)) == count($requested_dept), $requested_dept];
+                return [
+                    count(array_intersect($requested_dept, $agent_dept)) == count($requested_dept),
+                    $requested_dept
+                ];
             }
 
             return [false, []];
@@ -464,22 +586,23 @@ class FilterController extends Controller
     }
 
     /**
-     * @category function to filter and return ticket query builder based on priority
+     * @category function to filter ticket by source of creation
      *
-     * @param array $priority, builder $table
+     * @param array $name of source, builder $table
      *
-     * @var array $priority_ids
+     * @var array $sources
      *
      * @return builder
      */
-    public function filterByPriority($priority, $table)
+    public function filterBySource($source_names, $table)
     {
-        $priority_ids = Ticket_Priority::whereIn('priority', $priority)->pluck('priority_id')->toArray();
-        if (count($priority_ids) > 0) {
-            return $table->whereIn('tickets.priority_id', $priority_ids);
+        $sources = DB::table('ticket_source')->whereIn('name', $source_names)->orWhereIn('value',
+            $source_names)->pluck('id');
+        if (count($sources) == 0) {
+            return $table->where('tickets.id', '=', null);
         }
 
-        return $table->where('tickets.id', '=', null);
+        return $table->whereIn('tickets.source', $sources);
     }
 
     /**
@@ -495,7 +618,7 @@ class FilterController extends Controller
     {
         $query = DB::table('users')->where(function ($query) use ($user_names) {
             $query->whereIn('user_name', $user_names)
-                    ->orWhereIn('email', $user_names);
+                ->orWhereIn('email', $user_names);
         });
         if ($user_type == 'assign') {
             $query->where('role', '<>', 'user');
@@ -505,23 +628,6 @@ class FilterController extends Controller
         $users = $query->pluck('id');
 
         return $users;
-    }
-
-    /**
-     * @category function to fetch team id's where name is like given parameter
-     *
-     * @param array of string values $name
-     *
-     * @var $query, array $teams(all fetched teams id)
-     *
-     * @return array $teams
-     */
-    public function getTeamIds($name)
-    {
-        $query = DB::table('teams')->whereIn('name', $name);
-        $teams = $query->pluck('id');
-
-        return $teams;
     }
 
     /**
@@ -550,11 +656,52 @@ class FilterController extends Controller
         $teams = $this->getTeamIds($team_array);
         $table = $table->where(function ($query) use ($teams, $users) {
             $query->whereIn('tickets.team_id', $teams)
-                    ->orWhereIn('tickets.assigned_to', $users);
+                ->orWhereIn('tickets.assigned_to', $users);
         });
         // dd($table->toSql());
         return $table;
     }
+
+    /**
+     * @category function to fetch team id's where name is like given parameter
+     *
+     * @param array of string values $name
+     *
+     * @var $query , array $teams(all fetched teams id)
+     *
+     * @return array $teams
+     */
+    public function getTeamIds($name)
+    {
+        $query = DB::table('teams')->whereIn('name', $name);
+        $teams = $query->pluck('id');
+
+        return $teams;
+    }
+
+    /**    DEPRICATED
+     * @category function to get array of status to filter tickets
+     *
+     * @param string $status
+     *
+     * @return array $status_array
+     */
+    // public function getStatusArray($status)
+    // {
+    //     $type = new TicketStatusType();
+    //     $values = $type->select('name', 'id')
+    //             ->whereIn('name', [$status])
+    //             ->with(['status' => function ($query) {
+    //                 $query->select('id as status_id', 'name', 'purpose_of_status');
+    //             }])
+    //             ->get()
+    //             ->pluck('status')
+    //             ->flatten()
+    //             ->pluck('status_id')
+    //             ->toArray()
+    //         ;
+    //     return $values;
+    // }
 
     /**
      * @category function to filter table for various date option like created, last modified, duo date and overdue
@@ -848,7 +995,7 @@ class FilterController extends Controller
      * @category function to apply date filters in table builder after
      * getting start and end date based on the type of date filter
      *
-     * @param array $dates, builder $table, $column (type of filter based on which column is being chosen), $value
+     * @param array $dates , builder $table, $column (type of filter based on which column is being chosen), $value
      *
      * @var string $check_column (name of column), array $dates
      *
@@ -880,47 +1027,23 @@ class FilterController extends Controller
     }
 
     /**
-     * @category function to filter ticket by source of creation
+     * @category function to filter and return ticket query builder based on priority
      *
-     * @param array $name of source, builder $table
+     * @param array $priority , builder $table
      *
-     * @var array $sources
+     * @var array $priority_ids
      *
      * @return builder
      */
-    public function filterBySource($source_names, $table)
+    public function filterByPriority($priority, $table)
     {
-        $sources = DB::table('ticket_source')->whereIn('name', $source_names)->orWhereIn('value', $source_names)->pluck('id');
-        if (count($sources) == 0) {
-            return $table->where('tickets.id', '=', null);
+        $priority_ids = Ticket_Priority::whereIn('priority', $priority)->pluck('priority_id')->toArray();
+        if (count($priority_ids) > 0) {
+            return $table->whereIn('tickets.priority_id', $priority_ids);
         }
 
-        return $table->whereIn('tickets.source', $sources);
+        return $table->where('tickets.id', '=', null);
     }
-
-    /**    DEPRICATED
-     * @category function to get array of status to filter tickets
-     *
-     * @param string $status
-     *
-     * @return array $status_array
-     */
-    // public function getStatusArray($status)
-    // {
-    //     $type = new TicketStatusType();
-    //     $values = $type->select('name', 'id')
-    //             ->whereIn('name', [$status])
-    //             ->with(['status' => function ($query) {
-    //                 $query->select('id as status_id', 'name', 'purpose_of_status');
-    //             }])
-    //             ->get()
-    //             ->pluck('status')
-    //             ->flatten()
-    //             ->pluck('status_id')
-    //             ->toArray()
-    //         ;
-    //     return $values;
-    // }
 
     /**
      * @category function to filter tickets by SLA
@@ -945,69 +1068,6 @@ class FilterController extends Controller
     }
 
     /**
-     * @category function to filter table builder based on requested status
-     *
-     * @param string array $status_array, builder $table
-     *
-     * @return builder $table
-     */
-    public function filterByStatus($status_array, $table)
-    {
-        $status = DB::table('ticket_status')->whereIn('name', $status_array)->pluck('id');
-        if (count($status) > 0) {
-            return $table->whereIn('tickets.status', $status);
-        } else {
-            return $table->where('tickets.id', '=', null);
-        }
-    }
-
-    /**
-     * @category function to format and return user tickets
-     *
-     * @param string $segment
-     *
-     * @return builder
-     */
-    public function formatUserTickets($segment)
-    {
-        $table = $this->table();
-        $convert_to_array = explode('/', $segment);
-        if ($convert_to_array[1] == 'user') {
-            $user_id = $convert_to_array[2];
-            $user = \DB::table('users')->select('role', 'id')->where('id', '=', $user_id)->first();
-            if ($user->role == 'user') {
-                $table = $table->where('tickets.user_id', '=', $user->id);
-            } else {
-                $table = $table->where('tickets.assigned_to', '=', $user->id);
-            }
-        } elseif ($convert_to_array[1] == 'organizations') {
-            $users = []; //initialize by assuming there is no user in the organization
-            $organizations_details = \App\Model\helpdesk\Agent_panel\Organization::select('id', 'domain')->where('id', '=', $convert_to_array[2])->first()->toArray(); //fetch organization details
-            if (count($organizations_details) > 0) { //if organizationdetails found then process further
-                $org_users = \App\Model\helpdesk\Agent_panel\User_org::select('user_id')->where('org_id', '=', $organizations_details['id'])->get()->toArray();
-                if (count($org_users) > 0) {
-                    $users = array_column($org_users, 'user_id');
-                }
-                if ($organizations_details['domain'] != '') {
-                    $str = str_replace(',', '|@', '@'.$organizations_details['domain']);
-                    $domain_users = User::select('id')->where('role', '=', 'user')->whereRaw("email REGEXP '".$str."'")->whereNOtIn('id', $users);
-                    $domain_users = $domain_users->where('is_delete', '!=', 1)->where('ban', '!=', 1)->get()->toArray();
-                    if (count($domain_users) > 0) {
-                        $users = array_merge($users, array_column($domain_users, 'id'));
-                    }
-                }
-            }
-            $table = $table->whereIn('tickets.user_id', $users);
-        } elseif ($convert_to_array[1] == 'department') {
-            $table = $table->where('dept_id', '=', $convert_to_array[2]);
-        } else {
-            $table = $table->where('team_id', '=', $convert_to_array[2]);
-        }
-
-        return $table->whereIn('tickets.status', getStatusArray($convert_to_array[3]));
-    }
-
-    /**
      * @category function to filter results on basis of last replier
      *
      * @param string array $value, builder $ticket
@@ -1024,32 +1084,9 @@ class FilterController extends Controller
     }
 
     /**
-     * @category function to get GMT for system timezone
-     *
-     * @param null
-     *
-     * @var $system, $tz
-     *
-     * @return string GMT value of timezone
-     */
-    public function getGMT()
-    {
-        $system = \App\Model\helpdesk\Settings\System::select('time_zone')->first();
-        $timezone = \DB::table('timezone')->select('location')->where('id', '=', $system->time_zone)->first();
-        $location = '(GMT) London';
-        if ($timezone) {
-            $location = $timezone->location;
-        }
-        $tz = explode(')', substr($location, stripos($location, 'T')
-                            + 1));
-
-        return $tz[0];
-    }
-
-    /**
      * @category function to apply help topic filter
      *
-     * @param array $value, object $table
+     * @param array $value , object $table
      *
      * @return builder
      */
@@ -1058,23 +1095,5 @@ class FilterController extends Controller
         $help_topics = Help_topic::whereIn('topic', $value)->pluck('id')->toArray();
 
         return $table->whereIn('help_topic_id', $help_topics);
-    }
-
-    /**
-     * @category function to return builder for show filter after checking if input
-     * request has status or not
-     *
-     * @param bool $has_status(if request has status filter values or not),
-     *                            Object $table, string $status(basic pupose if status)
-     *
-     * @return object $table;
-     */
-    public function returnShowPageWithStatus($has_status, $table, $status)
-    {
-        if ($has_status) {
-            return $table;
-        }
-
-        return $table->whereIn('tickets.status', getStatusArray($status));
     }
 }

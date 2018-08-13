@@ -35,7 +35,7 @@ class Kernel extends ConsoleKernel
     {
         if (env('DB_INSTALL') == 1) {
             if ($this->getCurrentQueue() != 'sync') {
-                $schedule->command('queue:listen '.$this->getCurrentQueue().' --sleep 60')->everyMinute();
+                $schedule->command('queue:listen ' . $this->getCurrentQueue() . ' --sleep 60')->everyMinute();
             }
 
             $this->execute($schedule, 'fetching');
@@ -43,6 +43,18 @@ class Kernel extends ConsoleKernel
             $this->execute($schedule, 'work');
             $schedule->command('sla-escalate')->everyThirtyMinutes();
         }
+    }
+
+    public function getCurrentQueue()
+    {
+        $queue = 'database';
+        $services = new \App\Model\MailJob\QueueService();
+        $current = $services->where('status', 1)->first();
+        if ($current) {
+            $queue = $current->short_name;
+        }
+
+        return $queue;
     }
 
     public function execute($schedule, $task)
@@ -107,18 +119,6 @@ class Kernel extends ConsoleKernel
                 $schedule->dailyAt($at);
                 break;
         }
-    }
-
-    public function getCurrentQueue()
-    {
-        $queue = 'database';
-        $services = new \App\Model\MailJob\QueueService();
-        $current = $services->where('status', 1)->first();
-        if ($current) {
-            $queue = $current->short_name;
-        }
-
-        return $queue;
     }
 
     /**

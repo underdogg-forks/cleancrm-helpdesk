@@ -41,6 +41,16 @@ class StorageController extends Controller
         $this->rackspace_username = $this->rackspaceUsername();
     }
 
+    public function defaults()
+    {
+        $default = 'local';
+        if ($this->settings('default')) {
+            $default = $this->settings('default');
+        }
+
+        return $default;
+    }
+
     protected function settings($option)
     {
         $settings = new CommonSettings();
@@ -51,16 +61,6 @@ class StorageController extends Controller
         }
 
         return $value;
-    }
-
-    public function defaults()
-    {
-        $default = 'local';
-        if ($this->settings('default')) {
-            $default = $this->settings('default');
-        }
-
-        return $default;
     }
 
     public function driver()
@@ -88,29 +88,9 @@ class StorageController extends Controller
         return $this->settings('s3_region');
     }
 
-    public function s3Secret()
-    {
-        return $this->settings('s3_secret');
-    }
-
     public function s3Bucket()
     {
         return $this->settings('s3_bucket');
-    }
-
-    public function rackspaceKey()
-    {
-        return $this->settings('root');
-    }
-
-    public function rackspaceRegion()
-    {
-        return $this->settings('rackspace_region');
-    }
-
-    public function rackspaceUsername()
-    {
-        return $this->settings('rackspace_username');
     }
 
     public function rackspaceContainer()
@@ -123,9 +103,83 @@ class StorageController extends Controller
         return $this->settings('rackspace_endpoint');
     }
 
+    public function rackspaceKey()
+    {
+        return $this->settings('root');
+    }
+
+    public function rackspaceRegion()
+    {
+        return $this->settings('rackspace_region');
+    }
+
     public function rackspaceUrlType()
     {
         return $this->settings('rackspace_url_type');
+    }
+
+    public function rackspaceUsername()
+    {
+        return $this->settings('rackspace_username');
+    }
+
+    public function s3Secret()
+    {
+        return $this->settings('s3_secret');
+    }
+
+    public function saveAttachments($thread_id, $attachments = [])
+    {
+        $disposition = 'ATTACHMENT';
+        $thread = '';
+        foreach ($attachments as $attachment) {
+            if (is_object($attachment)) {
+                if (method_exists($attachment, 'getStructure')) {
+                    $structure = $attachment->getStructure();
+                    if (isset($structure->disposition)) {
+                        $disposition = $structure->disposition;
+                    }
+                    $filename = rand(1111, 9999) . '_' . $attachment->getFileName();
+                    $type = $attachment->getMimeType();
+                    $size = $attachment->getSize();
+                    $data = $attachment->getData();
+                } else {
+                    $filename = rand(1111, 9999) . '_' . $attachment->getClientOriginalName();
+                    $type = $attachment->getMimeType();
+                    $size = $attachment->getSize();
+                    $data = file_get_contents($attachment->getRealPath());
+                }
+                $this->upload($data, $filename, $type, $size, $disposition, $thread_id);
+                $thread = $this->updateBody($attachment, $thread_id, $filename);
+            }
+        }
+
+        return $thread;
+    }
+
+    public function upload($data, $filename, $type, $size, $disposition, $thread_id)
+    {
+        $upload = new Ticket_attachments();
+        $upload->thread_id = $thread_id;
+        $upload->name = $filename;
+        $upload->type = $type;
+        $upload->size = $size;
+        $upload->poster = $disposition;
+        $upload->driver = $this->default;
+        $upload->path = $this->root . DIRECTORY_SEPARATOR . 'attachments';
+        if ($this->default !== 'database') {
+            $this->setFileSystem();
+            Storage::disk($this->default)->put($filename, $data);
+            $storagePath = Storage::disk($this->default)->getDriver()->getAdapter()->getPathPrefix() . $filename;
+            if (mime(\File::mimeType($storagePath)) != 'image' || mime(\File::extension($storagePath)) != 'image') {
+                chmod($storagePath, 1204);
+            }
+        } else {
+            $upload->file = $data;
+        }
+        if ($data && $size && $disposition) {
+            $upload->save();
+        }
     }
 
     protected function setFileSystem()
@@ -148,8 +202,8 @@ class StorageController extends Controller
     {
         return [
             'default' => $this->default,
-            'cloud'   => 's3',
-            'disks'   => $this->disks(),
+            'cloud' => 's3',
+            'disks' => $this->disks(),
         ];
     }
 
@@ -158,79 +212,25 @@ class StorageController extends Controller
         return [
             'local' => [
                 'driver' => 'local',
-                'root'   => $this->root.'/attachments',
+                'root' => $this->root . '/attachments',
             ],
             's3' => [
                 'driver' => 's3',
-                'key'    => $this->s3_key,
+                'key' => $this->s3_key,
                 'secret' => $this->s3_secret,
                 'region' => $this->s3_region,
                 'bucket' => $this->s3_bucket,
             ],
             'rackspace' => [
-                'driver'    => 'rackspace',
-                'username'  => $this->rackspace_username,
-                'key'       => $this->rackspace_key,
+                'driver' => 'rackspace',
+                'username' => $this->rackspace_username,
+                'key' => $this->rackspace_key,
                 'container' => $this->rackspace_container,
-                'endpoint'  => $this->rackspace_endpoint,
-                'region'    => $this->rackspace_region,
-                'url_type'  => $this->rackspace_url_type,
+                'endpoint' => $this->rackspace_endpoint,
+                'region' => $this->rackspace_region,
+                'url_type' => $this->rackspace_url_type,
             ],
         ];
-    }
-
-    public function upload($data, $filename, $type, $size, $disposition, $thread_id)
-    {
-        $upload = new Ticket_attachments();
-        $upload->thread_id = $thread_id;
-        $upload->name = $filename;
-        $upload->type = $type;
-        $upload->size = $size;
-        $upload->poster = $disposition;
-        $upload->driver = $this->default;
-        $upload->path = $this->root.DIRECTORY_SEPARATOR.'attachments';
-        if ($this->default !== 'database') {
-            $this->setFileSystem();
-            Storage::disk($this->default)->put($filename, $data);
-            $storagePath = Storage::disk($this->default)->getDriver()->getAdapter()->getPathPrefix().$filename;
-            if (mime(\File::mimeType($storagePath)) != 'image' || mime(\File::extension($storagePath)) != 'image') {
-                chmod($storagePath, 1204);
-            }
-        } else {
-            $upload->file = $data;
-        }
-        if ($data && $size && $disposition) {
-            $upload->save();
-        }
-    }
-
-    public function saveAttachments($thread_id, $attachments = [])
-    {
-        $disposition = 'ATTACHMENT';
-        $thread = '';
-        foreach ($attachments as $attachment) {
-            if (is_object($attachment)) {
-                if (method_exists($attachment, 'getStructure')) {
-                    $structure = $attachment->getStructure();
-                    if (isset($structure->disposition)) {
-                        $disposition = $structure->disposition;
-                    }
-                    $filename = rand(1111, 9999).'_'.$attachment->getFileName();
-                    $type = $attachment->getMimeType();
-                    $size = $attachment->getSize();
-                    $data = $attachment->getData();
-                } else {
-                    $filename = rand(1111, 9999).'_'.$attachment->getClientOriginalName();
-                    $type = $attachment->getMimeType();
-                    $size = $attachment->getSize();
-                    $data = file_get_contents($attachment->getRealPath());
-                }
-                $this->upload($data, $filename, $type, $size, $disposition, $thread_id);
-                $thread = $this->updateBody($attachment, $thread_id, $filename);
-            }
-        }
-
-        return $thread;
     }
 
     public function updateBody($attachment, $thread_id, $filename)
@@ -251,7 +251,7 @@ class StorageController extends Controller
             $id = str_replace('>', '', str_replace('<', '', $structure->id));
             $body = $thread->body;
             // dd($id,$filename,$body);
-            $body = str_replace('cid:'.$id, $filename, $body);
+            $body = str_replace('cid:' . $id, $filename, $body);
             // dd($body);
             $thread->body = $body;
             $thread->save();
@@ -263,7 +263,7 @@ class StorageController extends Controller
     public function getFile($drive, $name, $root)
     {
         if ($drive != 'database') {
-            $root = $root.DIRECTORY_SEPARATOR.$name;
+            $root = $root . DIRECTORY_SEPARATOR . $name;
             if (\File::exists($root)) {
                 chmod($root, 0755);
 

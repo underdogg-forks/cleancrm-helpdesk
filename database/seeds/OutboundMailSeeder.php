@@ -14,21 +14,35 @@ class OutboundMailSeeder extends Seeder
     public function run()
     {
         $mail = new MailService();
-        $mail_services = ['smtp' => 'SMTP', 'mail' => 'Php Mail', 'sendmail' => 'Send Mail', 'mailgun' => 'Mailgun', 'mandrill' => 'Mandrill', 'log' => 'Log file'];
+        $mail_services = [
+            'smtp' => 'SMTP',
+            'mail' => 'Php Mail',
+            'sendmail' => 'Send Mail',
+            'mailgun' => 'Mailgun',
+            'mandrill' => 'Mandrill',
+            'log' => 'Log file'
+        ];
         foreach ($mail_services as $key => $value) {
             $mail->create([
-                'name'       => $value,
+                'name' => $value,
                 'short_name' => $key,
             ]);
         }
 
         $queue = new QueueService();
-        $services = ['sync' => 'Sync', 'database' => 'Database', 'beanstalkd' => 'Beanstalkd', 'sqs' => 'SQS', 'iron' => 'Iron', 'redis' => 'Redis'];
+        $services = [
+            'sync' => 'Sync',
+            'database' => 'Database',
+            'beanstalkd' => 'Beanstalkd',
+            'sqs' => 'SQS',
+            'iron' => 'Iron',
+            'redis' => 'Redis'
+        ];
         foreach ($services as $key => $value) {
             $queue->create([
-                'name'       => $value,
+                'name' => $value,
                 'short_name' => $key,
-                'status'     => 0,
+                'status' => 0,
             ]);
         }
         $q = $queue->where('short_name', 'sync')->first();

@@ -4,12 +4,9 @@ namespace App\Exceptions;
 
 // controller
 use Bugsnag;
-//use Illuminate\Validation\ValidationException;
 use Bugsnag\BugsnagLaravel\BugsnagExceptionHandler as ExceptionHandler;
 use Config;
 use Exception;
-// use Symfony\Component\HttpKernel\Exception\HttpException;
-// use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Validation\ValidationException as foundation;
@@ -17,6 +14,11 @@ use Illuminate\Session\TokenMismatchException;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\MethodNotAllowedHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+
+//use Illuminate\Validation\ValidationException;
+
+// use Symfony\Component\HttpKernel\Exception\HttpException;
+// use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
 
 class Handler extends ExceptionHandler
 {
@@ -67,22 +69,9 @@ class Handler extends ExceptionHandler
     }
 
     /**
-     * Convert a validation exception into a JSON response.
-     *
-     * @param \Illuminate\Http\Request                   $request
-     * @param \Illuminate\Validation\ValidationException $exception
-     *
-     * @return \Illuminate\Http\JsonResponse
-     */
-    protected function invalidJson($request, ValidationException $exception)
-    {
-        return response()->json($exception->errors(), $exception->status);
-    }
-
-    /**
      * Render an exception into an HTTP response.
      *
-     * @param type      $request
+     * @param type $request
      * @param Exception $e
      *
      * @return type mixed
@@ -107,74 +96,6 @@ class Handler extends ExceptionHandler
             default:
                 return $this->common($request, $e);
         }
-    }
-
-    /**
-     * Function to render 500 error page.
-     *
-     * @param type $request
-     * @param type $e
-     *
-     * @return type mixed
-     */
-    public function render500($request, $e)
-    {
-        if (config('app.debug') == true) {
-            return parent::render($request, $e);
-        } elseif ($e instanceof foundation) {
-            return parent::render($request, $e);
-        } elseif ($e instanceof \Illuminate\Validation\ValidationException) {
-            return parent::render($request, $e);
-        }
-
-        return response()->view('errors.500');
-        //return redirect()->route('error500', []);
-    }
-
-    /**
-     * Function to render 404 error page.
-     *
-     * @param type $request
-     * @param type $e
-     *
-     * @return type mixed
-     */
-    public function render404($request, $e)
-    {
-        $seg = $request->segments();
-        if (in_array('api', $seg)) {
-            return response()->json(['success' => false, 'message' => trans('lang.invalid_attempt')], 404);
-        }
-        if (config('app.debug') == true) {
-            if ($e->getStatusCode() == '404') {
-                return redirect()->route('error404', []);
-            }
-
-            return parent::render($request, $e);
-        }
-
-        return redirect()->route('error404', []);
-    }
-
-    /**
-     * Function to render database connection failed.
-     *
-     * @param type $request
-     * @param type $e
-     *
-     * @return type mixed
-     */
-    public function renderDB($request, $e)
-    {
-        $seg = $request->segments();
-        if (in_array('api', $seg)) {
-            return response()->json(['status' => '404']);
-        }
-        if (config('app.debug') == true) {
-            return parent::render($request, $e);
-        }
-
-        return redirect()->route('error404', []);
     }
 
     /**
@@ -226,5 +147,86 @@ class Handler extends ExceptionHandler
         }
 
         return parent::render($request, $e);
+    }
+
+    /**
+     * Function to render 404 error page.
+     *
+     * @param type $request
+     * @param type $e
+     *
+     * @return type mixed
+     */
+    public function render404($request, $e)
+    {
+        $seg = $request->segments();
+        if (in_array('api', $seg)) {
+            return response()->json(['success' => false, 'message' => trans('lang.invalid_attempt')], 404);
+        }
+        if (config('app.debug') == true) {
+            if ($e->getStatusCode() == '404') {
+                return redirect()->route('error404', []);
+            }
+
+            return parent::render($request, $e);
+        }
+
+        return redirect()->route('error404', []);
+    }
+
+    /**
+     * Function to render database connection failed.
+     *
+     * @param type $request
+     * @param type $e
+     *
+     * @return type mixed
+     */
+    public function renderDB($request, $e)
+    {
+        $seg = $request->segments();
+        if (in_array('api', $seg)) {
+            return response()->json(['status' => '404']);
+        }
+        if (config('app.debug') == true) {
+            return parent::render($request, $e);
+        }
+
+        return redirect()->route('error404', []);
+    }
+
+    /**
+     * Function to render 500 error page.
+     *
+     * @param type $request
+     * @param type $e
+     *
+     * @return type mixed
+     */
+    public function render500($request, $e)
+    {
+        if (config('app.debug') == true) {
+            return parent::render($request, $e);
+        } elseif ($e instanceof foundation) {
+            return parent::render($request, $e);
+        } elseif ($e instanceof \Illuminate\Validation\ValidationException) {
+            return parent::render($request, $e);
+        }
+
+        return response()->view('errors.500');
+        //return redirect()->route('error500', []);
+    }
+
+    /**
+     * Convert a validation exception into a JSON response.
+     *
+     * @param \Illuminate\Http\Request $request
+     * @param \Illuminate\Validation\ValidationException $exception
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    protected function invalidJson($request, ValidationException $exception)
+    {
+        return response()->json($exception->errors(), $exception->status);
     }
 }
