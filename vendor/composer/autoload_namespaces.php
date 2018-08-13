@@ -18,7 +18,6 @@ return array(
     'Guzzle' => array($vendorDir . '/guzzle/guzzle/src'),
     'ForceUTF8\\' => array($vendorDir . '/neitanod/forceutf8/src'),
     'Flow' => array($vendorDir . '/flowjs/flow-php-server/src'),
-    'Fetch' => array($vendorDir . '/tedivm/fetch/src'),
     'Doctrine\\DBAL\\' => array($vendorDir . '/doctrine/dbal/lib'),
     'Doctrine\\Common\\Lexer\\' => array($vendorDir . '/doctrine/lexer/lib'),
     'Diff' => array($vendorDir . '/phpspec/php-diff/lib'),
